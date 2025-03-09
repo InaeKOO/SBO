@@ -1,4 +1,5 @@
 import os
+import time
 import numpy as np
 from scipy import optimize
 import matplotlib.pyplot as plt
@@ -27,7 +28,7 @@ from qiskit_nature.second_q.algorithms import GroundStateEigensolver
 from qiskit_algorithms import VQE
 
 # The ansatz has been updated: use UCCSD (singles and doubles)
-from qiskit_nature.second_q.circuit.library import UCCSD, HartreeFock
+from qiskit_nature.second_q.circuit.library import UCC, UCCSD, HartreeFock
 
 # Converter and mapper for transforming the fermionic problem to qubits
 from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
@@ -343,6 +344,7 @@ if __name__ == "__main__":
     vqe_spsa_energies = {}
     nshots = 100
     repetition_count = 5
+    start_time = time.time()  # Start timing
 
     for distance in distances:
         exact_energies[distance] = []
@@ -361,7 +363,10 @@ if __name__ == "__main__":
             ansatz = UCCSD(
                 num_spatial_orbitals=2,
                 num_particles=(1, 1),
-                qubit_mapper=mapper
+                qubit_mapper=mapper,
+                initial_state=HartreeFock(
+                    2,(1,1),mapper,
+                )
             )
             # Exact solver
             numpy_solver = NumPyMinimumEigensolver()
@@ -369,14 +374,14 @@ if __name__ == "__main__":
 
             # VQE using our custom surrogate-based optimizer (SBO)
             sbo_optimizer = Optimizer(
-                maxiter=4,
+                maxiter=20,
                 patch_size=0.15,
                 npoints_per_patch=4,
                 nfev_final_avg=4
             )
             vqe_solver = VQE(
                 Estimator(backend_options={
-                    "method": "density_matrix",
+                    "method": "automatic",
                     "device": "GPU"  # directs simulation to the GPU
                 }), ansatz,
                 optimizer=sbo_optimizer
@@ -384,15 +389,10 @@ if __name__ == "__main__":
             vqe_sbo_energies[distance].append(solve(vqe_solver))
 
             # VQE with SPSA optimizer on ideal simulator, num function evals=20
-            ansatz = UCCSD(
-                num_spatial_orbitals=2,
-                num_particles=(1, 1),
-                qubit_mapper=mapper
-            )
-            spsa_optimizer = SPSA(maxiter=10)
+            spsa_optimizer = SPSA(maxiter=20)
             vqe_solver = VQE(
                 Estimator(backend_options={
-                    "method": "density_matrix",
+                    "method": "automatic",
                     "device": "GPU"  # directs simulation to the GPU
                 }), ansatz,
                 optimizer=spsa_optimizer
@@ -404,6 +404,11 @@ if __name__ == "__main__":
               f"SPSA: {np.mean(vqe_spsa_energies[distance]):.6f}, " + 
               f"Exact Result: {np.mean(exact_energies[distance]):.6f}")
         
+    end_time = time.time()
+    execution_time = end_time - start_time
+    print(f"\nTotal execution time: {execution_time:.2f} seconds")
+    print(f"                      {execution_time/60:.2f} minutes")
+            
     plt.figure(figsize=(7, 5))
     plt.rcParams['font.size'] = 14
     plt.plot(distances, np.mean(list(exact_energies.values()), axis=1), 'k-', linewidth=1, label='exact')
@@ -414,5 +419,5 @@ if __name__ == "__main__":
     plt.xlabel('interatomic distance')
     plt.ylabel('energy')
     plt.ylim(-1.3, 1.9)
-    plt.title(r"H$_2$ VQE, shot noise only, K=100")
+    plt.title(rf"H$_2$ VQE, shot noise only, K=100, Time: {execution_time:.1f}s")
     save_figure("H2_VQE_2q")

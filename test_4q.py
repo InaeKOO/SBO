@@ -35,6 +35,12 @@ from qiskit_nature.second_q.mappers import JordanWignerMapper, ParityMapper
 # Define the electronic structure problem (same name, but under the updated package)
 from qiskit_nature.second_q.problems import ElectronicStructureProblem
 
+from qiskit_ionq import IonQProvider
+
+provider = IonQProvider(token="12781dfb-bf64-46ec-96fe-40a7499f14f3")
+#qpu_backend = provider.get_backend("qpu.aria-1")
+print(provider.backends())
+
 # Type alias for points (can be a float or an array)
 POINT = Union[float, np.ndarray]
 # Create an instance of AerSimulator (here, specifying GPU)
@@ -361,7 +367,10 @@ if __name__ == "__main__":
             ansatz = UCCSD(
                 num_spatial_orbitals=2,
                 num_particles=(1,1),
-                qubit_mapper=mapper
+                qubit_mapper=mapper,
+                initial_state=HartreeFock(
+                    2,(1,1),mapper,
+                )
             )
             # Exact solver
             numpy_solver = NumPyMinimumEigensolver()
@@ -369,14 +378,14 @@ if __name__ == "__main__":
 
             # VQE using our custom surrogate-based optimizer (SBO)
             sbo_optimizer = Optimizer(
-                maxiter=4,
-                patch_size=0.15,
+                maxiter=20,
+                patch_size=0.3,
                 npoints_per_patch=4,
                 nfev_final_avg=4
             )
             vqe_solver = VQE(
                 Estimator(backend_options={
-                    "method": "density_matrix",
+                    "method": "automatic",
                     "device": "GPU"  # directs simulation to the GPU
                 }), ansatz,
                 optimizer=sbo_optimizer
@@ -384,10 +393,10 @@ if __name__ == "__main__":
             vqe_sbo_energies[distance].append(solve(vqe_solver))
 
             # VQE with SPSA optimizer on ideal simulator, num function evals=20
-            spsa_optimizer = SPSA(maxiter=10)
+            spsa_optimizer = SPSA(maxiter=20)
             vqe_solver = VQE(
                 Estimator(backend_options={
-                    "method": "density_matrix",
+                    "method": "automatic",
                     "device": "GPU"  # directs simulation to the GPU
                 }), ansatz,
                 optimizer=spsa_optimizer
