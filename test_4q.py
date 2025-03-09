@@ -355,12 +355,12 @@ if __name__ == "__main__":
         )
         driver = PySCFDriver.from_molecule(molecule, basis="sto3g")
         es_problem = driver.run()
-        mapper = ParityMapper(num_particles=(2,2))
+        mapper = JordanWignerMapper()
 
         for _ in range(repetition_count):
             ansatz = UCCSD(
                 num_spatial_orbitals=2,
-                num_particles=(2,2),
+                num_particles=(1,1),
                 qubit_mapper=mapper
             )
             # Exact solver
