@@ -4,7 +4,7 @@ Defines the Optimizer class.
 from .optimizer_iteration import OptimizerIteration
 
 import numpy as np
-import qiskit.algorithms.optimizers.optimizer as qiskitopt
+import qiskit_algorithms.optimizers.optimizer as qiskitopt
 from typing import Dict, Optional, Union, Callable, Tuple, List
 
 POINT = Union[float, np.ndarray]
