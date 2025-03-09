@@ -35,3 +35,4 @@ pip install -e .
 If you use or refer to this project in any publication, please cite the corresponding paper:
 
 > Ryan Shaffer, Lucas Kocia, Mohan Sarovar. _Surrogate-based optimization for variational quantum algorithms._ Phys. Rev. A 107, 032415 (2023). https://doi.org/10.1103/PhysRevA.107.032415
+# SBO
