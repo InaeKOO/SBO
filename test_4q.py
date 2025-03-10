@@ -1,11 +1,12 @@
 import os
+import torch
 import numpy as np
 from scipy import optimize
 import matplotlib.pyplot as plt
 from typing import Dict, Optional, Union, Callable, Tuple, List, Any
 
 # Primitives for execution
-from qiskit_aer import AerSimulator
+from qiskit_aer import AerSimulator, Aer
 from qiskit_aer.primitives import Sampler, Estimator
 
 # Minimum eigensolver from the new algorithms module
@@ -45,6 +46,7 @@ print(provider.backends())
 POINT = Union[float, np.ndarray]
 # Create an instance of AerSimulator (here, specifying GPU)
 sim = AerSimulator(device="GPU")
+qasm_backend = AerSimulator(method="automatic", shots=100)
 # Now call available_devices() on the instance
 print(sim.available_devices())
 
@@ -115,7 +117,14 @@ class Optimizer(qiskitopt.Optimizer):
             )
             new_x = res.x
             distance = np.linalg.norm(new_x - current_x, ord=np.inf)
+            #print("f(x) difference : ", abs(fun(new_x)-fun(current_x)))
+            #print("distance : ",distance)
+            #print("ratio : ", 0.1 / distance * abs(fun(new_x)-fun(current_x)))
+            self.batch_size = distance / max(abs(fun(new_x)-fun(current_x), 0.01))
+            print("batch_size : ",self.batch_size)
+            #self.batch_size = distance * 100
             current_x = new_x
+            #self.patch_size = distance * 
             if distance < (self.patch_size / 2) * (1 - self.epsilon_int):
                 # local minimum found within this patch area
                 local_minima_found.append(new_x)
@@ -349,7 +358,7 @@ if __name__ == "__main__":
     vqe_spsa_energies = {}
     nshots = 100
     repetition_count = 5
-
+    
     for distance in distances:
         exact_energies[distance] = []
         vqe_sbo_energies[distance] = []
@@ -363,7 +372,25 @@ if __name__ == "__main__":
         es_problem = driver.run()
         mapper = JordanWignerMapper()
 
+        backend_options = {"method": "automatic","device": "gpu"} if torch.cuda.is_available() else {"method": "automatic"}
+        estimator = Estimator(backend_options=backend_options, run_options={
+                        "shots": nshots
+                })
+        #print("Number of free parameters in UCCSD:", ansatz.num_parameters)
+
         for _ in range(repetition_count):
+            
+            # Exact solver
+            numpy_solver = NumPyMinimumEigensolver()
+            exact_energies[distance].append(solve(numpy_solver))
+
+            # VQE using our custom surrogate-based optimizer (SBO)
+            sbo_optimizer = Optimizer(
+                maxiter=20,
+                patch_size=0.15,
+                npoints_per_patch=4,
+                nfev_final_avg=4
+            )
             ansatz = UCCSD(
                 num_spatial_orbitals=2,
                 num_particles=(1,1),
@@ -372,34 +399,23 @@ if __name__ == "__main__":
                     2,(1,1),mapper,
                 )
             )
-            # Exact solver
-            numpy_solver = NumPyMinimumEigensolver()
-            exact_energies[distance].append(solve(numpy_solver))
-
-            # VQE using our custom surrogate-based optimizer (SBO)
-            sbo_optimizer = Optimizer(
-                maxiter=20,
-                patch_size=0.3,
-                npoints_per_patch=4,
-                nfev_final_avg=4
-            )
             vqe_solver = VQE(
-                Estimator(backend_options={
-                    "method": "automatic",
-                    "device": "GPU"  # directs simulation to the GPU
-                }), ansatz,
-                optimizer=sbo_optimizer
+                estimator, ansatz, optimizer=sbo_optimizer
             )
             vqe_sbo_energies[distance].append(solve(vqe_solver))
 
             # VQE with SPSA optimizer on ideal simulator, num function evals=20
-            spsa_optimizer = SPSA(maxiter=20)
+            spsa_optimizer = SPSA(maxiter=10)
+            ansatz = UCCSD(
+                num_spatial_orbitals=2,
+                num_particles=(1,1),
+                qubit_mapper=mapper,
+                initial_state=HartreeFock(
+                    2,(1,1),mapper,
+                )
+            )
             vqe_solver = VQE(
-                Estimator(backend_options={
-                    "method": "automatic",
-                    "device": "GPU"  # directs simulation to the GPU
-                }), ansatz,
-                optimizer=spsa_optimizer
+                estimator, ansatz, optimizer=spsa_optimizer
             )
             vqe_spsa_energies[distance].append(solve(vqe_solver))
 

@@ -381,8 +381,7 @@ if __name__ == "__main__":
             )
             vqe_solver = VQE(
                 Estimator(backend_options={
-                    "method": "automatic",
-                    "device": "GPU"  # directs simulation to the GPU
+                    "method": "automatic"
                 }), ansatz,
                 optimizer=sbo_optimizer
             )
@@ -392,8 +391,7 @@ if __name__ == "__main__":
             spsa_optimizer = SPSA(maxiter=20)
             vqe_solver = VQE(
                 Estimator(backend_options={
-                    "method": "automatic",
-                    "device": "GPU"  # directs simulation to the GPU
+                    "method": "automatic"
                 }), ansatz,
                 optimizer=spsa_optimizer
             )
